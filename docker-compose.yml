@@ -1,0 +1,132 @@
+name: causalscope
+x-app: &app
+  build:
+    context: .
+    dockerfile: infrastructure/docker/Dockerfile
+  environment: &environment
+    NODE_ENV: development
+    STORAGE_MODE: production
+    DATABASE_URL: postgresql://causalscope:${POSTGRES_PASSWORD:-local_only_password}@postgres:5432/causalscope
+    CLICKHOUSE_URL: http://clickhouse:8123
+    CLICKHOUSE_USER: causalscope
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-local_only_password}
+    INGEST_TOKEN: ${INGEST_TOKEN:-local-synthetic-ingest-token-replace}
+    CONTROL_TOKEN: ${CONTROL_TOKEN:-local-synthetic-control-token-replace}
+    SESSION_SECRET: ${SESSION_SECRET:-local-session-secret-replace-before-deployment}
+    WEB_ORIGIN: http://localhost:4400
+    SERVE_WEB: "true"
+    API_PORT: 4400
+    INGEST_PORT: 4319
+    INGEST_HOST: ingest
+    DEMO_HOST: demo
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+    FAULT_LAB_ENABLED: "true"
+    GEMINI_ENABLED: "false"
+  init: true
+  restart: unless-stopped
+  mem_limit: 512m
+  cpus: 1
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: causalscope
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_only_password}
+      POSTGRES_DB: causalscope
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    ports: [127.0.0.1:5432:5432]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U causalscope]
+      interval: 5s
+      retries: 15
+    mem_limit: 384m
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_USER: causalscope
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-local_only_password}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infrastructure/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports: [127.0.0.1:8123:8123]
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query "SELECT 1"',
+        ]
+      interval: 5s
+      retries: 20
+    mem_limit: 1g
+  migrate:
+    <<: *app
+    restart: "no"
+    command: [./node_modules/.bin/prisma, migrate, deploy]
+    depends_on:
+      postgres: { condition: service_healthy }
+  ingest:
+    <<: *app
+    command: [node, --import, tsx, apps/ingest/main.ts]
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:4319/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      retries: 15
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.163.1
+    command: [--config=/etc/otelcol/config.yaml]
+    environment:
+      INGEST_TOKEN: ${INGEST_TOKEN:-local-synthetic-ingest-token-replace}
+    volumes:
+      [./infrastructure/collector/config.yaml:/etc/otelcol/config.yaml:ro]
+    depends_on:
+      ingest: { condition: service_healthy }
+    mem_limit: 192m
+  demo:
+    <<: *app
+    command: [node, --import, tsx, apps/demo-system/main.ts]
+    depends_on:
+      collector: { condition: service_started }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      retries: 15
+  analyzer:
+    <<: *app
+    command: [node, --import, tsx, apps/analyzer/main.ts]
+    depends_on:
+      ingest: { condition: service_healthy }
+  api:
+    <<: *app
+    ports: [127.0.0.1:4400:4400]
+    depends_on:
+      ingest: { condition: service_healthy }
+      demo: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:4400/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      retries: 15
+volumes:
+  postgres-data:
+  clickhouse-data:

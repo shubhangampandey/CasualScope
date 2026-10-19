@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+// Typed domain records are validated by API schemas. Composite tenant keys are mandatory.
+model StoredRecord {
+  workspace String
+  kind String
+  id String
+  data Json
+  updated DateTime @updatedAt
+  @@id([workspace, kind, id])
+  @@index([workspace, kind, updated])
+}
+// Intentionally separate from observations and inaccessible to the inference package.
+model FaultGroundTruth {
+  workspace String
+  id String
+  data Json
+  @@id([workspace,id])
+}

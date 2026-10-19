@@ -1,0 +1,38 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  batch:
+    timeout: 500ms
+    send_batch_size: 512
+    send_batch_max_size: 1000
+exporters:
+  otlp_http/ingest:
+    endpoint: http://127.0.0.1:4319
+    headers:
+      Authorization: Bearer ${env:INGEST_TOKEN}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 5s
+      max_elapsed_time: 30s
+    sending_queue:
+      enabled: true
+      queue_size: 128
+      num_consumers: 2
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:13133
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/ingest]

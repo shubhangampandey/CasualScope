@@ -1,0 +1,35 @@
+{
+  "at": "2026-10-17T22:30:18.733Z",
+  "pair": {
+    "id": "2d738828-228e-4b78-887a-3f9340e55f98",
+    "workspace": "northstar",
+    "environment": "commerce",
+    "status": "completed",
+    "baselineId": "cefa666d-69a0-4753-979c-b318a6c59749",
+    "faultId": "fc6ccdc0-e8e1-4102-9f68-4c473eee23f2"
+  },
+  "baseline": {
+    "id": "cefa666d-69a0-4753-979c-b318a6c59749",
+    "requests": 39,
+    "errors": 0
+  },
+  "fault": {
+    "id": "fc6ccdc0-e8e1-4102-9f68-4c473eee23f2",
+    "requests": 38,
+    "errors": 33
+  },
+  "analysisId": "42f7f34c-e608-452d-8f83-4562493ba90b",
+  "sourceRuns": [
+    {
+      "id": "cefa666d-69a0-4753-979c-b318a6c59749",
+      "start": 1792276206935,
+      "end": 1792276212011
+    },
+    {
+      "id": "fc6ccdc0-e8e1-4102-9f68-4c473eee23f2",
+      "start": 1792276212535,
+      "end": 1792276218133
+    }
+  ],
+  "limitation": "Short orchestration smoke test; duration is insufficient for a full statistical baseline."
+}

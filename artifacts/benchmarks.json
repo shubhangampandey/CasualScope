@@ -1,0 +1,203 @@
+{
+  "at": "2026-10-17T22:32:07.435Z",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "node": "v24.21.0",
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+    "logicalCPUs": 12,
+    "totalMemoryBytes": 16802910208
+  },
+  "measures": [
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 8,
+      "spans": 800,
+      "operation": "graph",
+      "iterations": 10,
+      "p50Ms": 0.9517500000000041,
+      "p95Ms": 3.4784299999999795,
+      "p99Ms": 3.783925999999992
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 8,
+      "spans": 800,
+      "operation": "reconstruction",
+      "iterations": 10,
+      "p50Ms": 1.7153999999999883,
+      "p95Ms": 2.686474999999972,
+      "p99Ms": 2.9228149999999915
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 8,
+      "spans": 800,
+      "operation": "aggregation",
+      "iterations": 10,
+      "p50Ms": 0.4812000000000012,
+      "p95Ms": 0.5923850000000244,
+      "p99Ms": 0.5962370000000397
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 8,
+      "spans": 800,
+      "operation": "detection",
+      "iterations": 10,
+      "p50Ms": 0.00909999999998945,
+      "p95Ms": 0.011589999999986842,
+      "p99Ms": 0.012238000000008355
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 8,
+      "spans": 800,
+      "operation": "ranking",
+      "iterations": 10,
+      "p50Ms": 1.7041499999999985,
+      "p95Ms": 2.045384999999996,
+      "p99Ms": 2.061476999999988
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 8,
+      "spans": 800,
+      "operation": "analysis",
+      "iterations": 10,
+      "p50Ms": 5.5391500000000065,
+      "p95Ms": 8.912914999999986,
+      "p99Ms": 9.284903000000007
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 25,
+      "spans": 2500,
+      "operation": "graph",
+      "iterations": 10,
+      "p50Ms": 3.5417500000000075,
+      "p95Ms": 5.6772950000000195,
+      "p99Ms": 6.206099000000007
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 25,
+      "spans": 2500,
+      "operation": "reconstruction",
+      "iterations": 10,
+      "p50Ms": 6.10775000000001,
+      "p95Ms": 13.812154999999992,
+      "p99Ms": 15.113950999999982
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 25,
+      "spans": 2500,
+      "operation": "aggregation",
+      "iterations": 10,
+      "p50Ms": 1.8314000000000306,
+      "p95Ms": 2.448350000000004,
+      "p99Ms": 2.761190000000056
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 25,
+      "spans": 2500,
+      "operation": "detection",
+      "iterations": 10,
+      "p50Ms": 0.19105000000001837,
+      "p95Ms": 0.28023999999998067,
+      "p99Ms": 0.2920479999999634
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 25,
+      "spans": 2500,
+      "operation": "ranking",
+      "iterations": 10,
+      "p50Ms": 9.066399999999987,
+      "p95Ms": 11.622640000000052,
+      "p99Ms": 11.631568000000062
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 25,
+      "spans": 2500,
+      "operation": "analysis",
+      "iterations": 10,
+      "p50Ms": 20.267949999999928,
+      "p95Ms": 22.595719999999954,
+      "p99Ms": 22.919863999999993
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 100,
+      "spans": 10000,
+      "operation": "graph",
+      "iterations": 10,
+      "p50Ms": 11.984749999999963,
+      "p95Ms": 15.094909999999997,
+      "p99Ms": 15.538502000000012
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 100,
+      "spans": 10000,
+      "operation": "reconstruction",
+      "iterations": 10,
+      "p50Ms": 21.8673,
+      "p95Ms": 30.25727499999997,
+      "p99Ms": 32.89481500000003
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 100,
+      "spans": 10000,
+      "operation": "aggregation",
+      "iterations": 10,
+      "p50Ms": 5.682400000000143,
+      "p95Ms": 7.687659999999968,
+      "p99Ms": 8.760891999999952
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 100,
+      "spans": 10000,
+      "operation": "detection",
+      "iterations": 10,
+      "p50Ms": 0.6609999999999445,
+      "p95Ms": 0.9480899999999106,
+      "p99Ms": 1.0869779999999174
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 100,
+      "spans": 10000,
+      "operation": "ranking",
+      "iterations": 10,
+      "p50Ms": 36.450300000000084,
+      "p95Ms": 45.54409999999994,
+      "p99Ms": 46.29361999999998
+    },
+    {
+      "kind": "synthetic algorithm input (not deployed microservices)",
+      "services": 100,
+      "spans": 10000,
+      "operation": "analysis",
+      "iterations": 10,
+      "p50Ms": 83.5335500000001,
+      "p95Ms": 100.07350500000008,
+      "p99Ms": 100.77806100000012
+    },
+    {
+      "kind": "local SQLite (not ClickHouse)",
+      "operation": "insert + bounded read",
+      "rows": 5000,
+      "insertMs": 43.14840000000004,
+      "queryMs": 9.423699999999826,
+      "rowsRead": 5000,
+      "rowsPerSecond": 115879.15195001426
+    }
+  ],
+  "limitations": "10 iterations; algorithm-only generated data. No production ingestion throughput, HTTP latency, Collector durability, or ClickHouse performance claim."
+}
