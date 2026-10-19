@@ -5,7 +5,7 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { resolve } from "node:path";
 import { Store } from "../../packages/storage/index.js";
-import { config } from "../../packages/shared/config.js";
+import { config, isWebOrigin } from "../../packages/shared/config.js";
 import {
   states,
   experimentSchema,
@@ -22,7 +22,13 @@ import {
   traverse,
   paths,
 } from "../../packages/analysis/index.js";
-import { authenticated, permission, login, type User } from "./auth.js";
+import {
+  authenticated,
+  permission,
+  login,
+  register,
+  type User,
+} from "./auth.js";
 import { Experiments } from "./experiments.js";
 import { runAnalysis } from "../analyzer/worker.js";
 import { logger } from "../../packages/shared/logger.js";
@@ -105,8 +111,8 @@ export function createApp(store: Store) {
   app.use((req, res, next) => {
     const id = crypto.randomUUID();
     res.set("X-Correlation-ID", id);
-    if (req.get("origin") === config.WEB_ORIGIN) {
-      res.set("Access-Control-Allow-Origin", config.WEB_ORIGIN);
+    if (isWebOrigin(req.get("origin"))) {
+      res.set("Access-Control-Allow-Origin", req.get("origin")!);
       res.set("Access-Control-Allow-Credentials", "true");
       res.set("Vary", "Origin");
       res.set(
@@ -123,6 +129,10 @@ export function createApp(store: Store) {
   });
   app.use(cookieParser());
   app.use(express.json({ limit: "256kb" }));
+  app.use("/api/v1/auth", (_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+  });
   app.use(
     "/api",
     rateLimit({
@@ -151,23 +161,70 @@ export function createApp(store: Store) {
     "/api/v1/auth/login",
     rateLimit({ windowMs: 60000, limit: 10, legacyHeaders: false }),
     asyncRoute(async (req, res) => {
-      if (req.get("origin") && req.get("origin") !== config.WEB_ORIGIN) {
+      if (req.get("origin") && !isWebOrigin(req.get("origin"))) {
         res.sendStatus(403);
         return;
       }
       const body = z
         .object({
-          email: z.email().max(200),
+          email: z.string().trim().toLowerCase().pipe(z.email().max(200)),
           password: z.string().min(1).max(200),
         })
         .strict()
         .parse(req.body);
       const result = await login(store, body.email, body.password, res);
       if (!result) {
-        res.status(401).json({ error: "Invalid email or password" });
+        res.status(401).json({
+          error:
+            "Email or password is incorrect. Use your registered account, or create an account.",
+        });
         return;
       }
       res.json(result);
+    }),
+  );
+  app.post(
+    "/api/v1/auth/register",
+    rateLimit({ windowMs: 60000, limit: 10, legacyHeaders: false }),
+    asyncRoute(async (req, res) => {
+      if (req.get("origin") && !isWebOrigin(req.get("origin"))) {
+        res.sendStatus(403);
+        return;
+      }
+      const input = z
+        .object({
+          name: z.string().trim().min(2).max(100),
+          email: z.string().trim().toLowerCase().pipe(z.email().max(200)),
+          password: z.string().min(14).max(200),
+        })
+        .strict()
+        .parse(req.body);
+      res
+        .status(201)
+        .json(
+          await register(store, input.name, input.email, input.password, res),
+        );
+    }),
+  );
+  app.get(
+    "/api/v1/auth/session",
+    authenticated(store, true),
+    asyncRoute(async (req, res) => {
+      res.json({
+        user: cleanUser(req.auth.user),
+        csrf: req.auth.session.csrf,
+        workspace: req.auth.workspace,
+        environment: req.auth.environment,
+        role: req.auth.role,
+        workspaceName:
+          (
+            await store.get<{ name: string }>(
+              req.auth.workspace,
+              "workspace",
+              req.auth.workspace,
+            )
+          )?.name ?? "Your workspace",
+      });
     }),
   );
   app.use("/api/v1", authenticated(store));

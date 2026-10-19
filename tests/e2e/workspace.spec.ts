@@ -1,10 +1,22 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import "dotenv/config";
+async function signIn(page: Page) {
+  await expect(
+    page.getByRole("button", { name: "Enter workspace" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Email", { exact: true })
+    .fill(process.env.DEMO_EMAIL || "engineer@northstar.local");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill(process.env.DEMO_PASSWORD || "Northstar-local-2026!");
+  await page.getByRole("button", { name: "Enter workspace" }).click();
+}
 for (const width of [1440, 1024, 768, 390])
   test(`workspace evidence surfaces at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/app");
-    if (await page.getByRole("button", { name: "Enter workspace" }).isVisible())
-      await page.getByRole("button", { name: "Enter workspace" }).click();
+    await signIn(page);
     await expect(
       page.getByRole("heading", { name: "Operations overview" }),
     ).toBeVisible();
@@ -48,8 +60,7 @@ test("inspect a captured trace and persist an investigator workflow", async ({
   page,
 }) => {
   await page.goto("/app");
-  if (await page.getByRole("button", { name: "Enter workspace" }).isVisible())
-    await page.getByRole("button", { name: "Enter workspace" }).click();
+  await signIn(page);
   await expect(
     page.getByRole("heading", { name: "Operations overview" }),
   ).toBeVisible();

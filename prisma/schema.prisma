@@ -22,3 +22,32 @@ model FaultGroundTruth {
   data Json
   @@id([workspace,id])
 }
+
+model TelemetrySpan {
+  workspace String
+  environment String
+  traceId String
+  spanId String
+  service String
+  start Float
+  data Json
+  @@id([workspace, environment, traceId, spanId])
+  @@index([workspace, environment, start])
+  @@index([workspace, environment, traceId, start])
+  @@index([workspace, environment, service, start])
+  @@index([start])
+}
+
+model TelemetryLog {
+  workspace String
+  environment String
+  id String
+  traceId String
+  service String
+  time Float
+  data Json
+  @@id([workspace, environment, id])
+  @@index([workspace, environment, time])
+  @@index([workspace, environment, traceId, time])
+  @@index([time])
+}

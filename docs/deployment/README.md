@@ -1,6 +1,16 @@
 # Deployment preparation
 
-No external deployment was performed. Use `docker compose up --build -d` for the prepared local full-storage stack. Docker was absent on the implementation host, so perform a real Compose acceptance run before treating this path as validated.
+## Free Render deployment
+
+`STORAGE_MODE=postgres` stores both metadata and telemetry in PostgreSQL. It preserves tenant and environment filtering, duplicate rejection, bounded queries, and configured retention without requiring a paid ClickHouse service. The existing `STORAGE_MODE=production` option continues to use PostgreSQL plus ClickHouse.
+
+Generate Prisma before building, deploy all migrations, and start `node --import tsx scripts/render-start.ts`. This entry point runs the API, loopback OTLP receiver, synthetic services, and bounded analyzer in one instance. Set `NODE_ENV=production`, unique production secrets and password, `PUBLIC_DEMO=true`, and the exact Vercel HTTPS origin. It validates production settings before migrating. Vercel proxies `/api` to Render to preserve same-origin sessions.
+
+When sharing a free PostgreSQL instance with another application, use a separate database schema in `DATABASE_URL` (for example, `?schema=casualscope`) to isolate Prisma migrations and tables. Render free databases expire after 30 days; migrate or upgrade before the expiry shown in the dashboard. Free web services sleep when inactive. This configuration is intended for a small portfolio workload, not ClickHouse-scale telemetry.
+
+## Full ClickHouse deployment
+
+Use `docker compose up --build -d` for the alternative local full-storage stack. Perform a real Compose acceptance run before treating the container path as validated.
 
 The Dockerfile builds the Vite frontend and TypeScript-checks the sources, generates Prisma, then runs a non-root Node user. The current runtime retains the build dependencies and runs TypeScript through tsx; a smaller compiled-server image is a future optimization. The migrate job must complete before dependent application services start. Full Compose serves the built UI from API port 4400 with a matching origin.
 

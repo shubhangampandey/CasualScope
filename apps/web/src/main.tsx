@@ -419,13 +419,24 @@ function Landing() {
   );
 }
 function Login() {
+  const [registering, setRegistering] = useState(false),
+    [name, setName] = useState(""),
+    [confirmation, setConfirmation] = useState("");
   const qc = useQueryClient(),
-    [email, setEmail] = useState("engineer@northstar.local"),
-    [password, setPassword] = useState("Northstar-local-2026!");
+    [email, setEmail] = useState(""),
+    [password, setPassword] = useState("");
   const m = useMutation({
-    mutationFn: () => api<{ csrf: string }>("auth/login", { email, password }),
+    mutationFn: () => {
+      if (registering && password !== confirmation)
+        throw new Error("Passwords do not match.");
+      return api<{ csrf: string }>(
+        registering ? "auth/register" : "auth/login",
+        { email, password, ...(registering ? { name } : {}) },
+      );
+    },
     onSuccess: (r) => {
       setCSRF(r.csrf);
+      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
       void qc.invalidateQueries({ queryKey: ["me"] });
     },
   });
@@ -441,13 +452,30 @@ function Login() {
           <br />
           your investigation.
         </h1>
-        <p>Sign in to your local synthetic workspace.</p>
+        <p>
+          {registering
+            ? "Create your own isolated synthetic workspace. Passwords need at least 14 characters."
+            : "Sign in with your registered account. Demo passwords differ between local and production environments."}
+        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             m.mutate();
           }}
         >
+          {registering && (
+            <label>
+              Full name
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                required
+                minLength={2}
+                maxLength={100}
+                autoComplete="name"
+              />
+            </label>
+          )}
           <label>
             Email
             <input
@@ -455,6 +483,7 @@ function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              maxLength={200}
               autoComplete="username"
             />
           </label>
@@ -465,18 +494,46 @@ function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              minLength={registering ? 14 : 1}
+              maxLength={200}
+              autoComplete={registering ? "new-password" : "current-password"}
             />
           </label>
+          {registering && (
+            <label>
+              Confirm password
+              <input
+                type="password"
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                required
+                minLength={14}
+                maxLength={200}
+                autoComplete="new-password"
+              />
+            </label>
+          )}
           {m.error && <ErrorState error={m.error} />}
           <button className="button dark" disabled={m.isPending}>
-            Enter workspace <ArrowRight size={16} />
+            {registering ? "Create account" : "Enter workspace"}{" "}
+            <ArrowRight size={16} />
           </button>
         </form>
-        <small>
-          Local development credentials are prefilled. Configure your own
-          credentials before deployment.
-        </small>
+        <button
+          type="button"
+          className="button"
+          disabled={m.isPending}
+          onClick={() => {
+            setRegistering(!registering);
+            setPassword("");
+            setConfirmation("");
+            m.reset();
+          }}
+        >
+          {registering
+            ? "Already registered? Sign in"
+            : "New here? Create an account"}
+        </button>
       </div>
       <div className="login-footer">
         OBSERVATION → CORRELATION → HYPOTHESIS → EXPERIMENT
@@ -488,7 +545,8 @@ function Shell() {
   const qc = useQueryClient(),
     me = useQuery({
       queryKey: ["me"],
-      queryFn: () => api<Me>("auth/me"),
+      queryFn: () =>
+        api<(Me & { workspaceName: string }) | null>("auth/session"),
       retry: false,
     }),
     [notice, setNotice] = useState(""),
@@ -548,6 +606,7 @@ function Shell() {
     setMobile(false);
   }, [location.pathname]);
   if (me.isPending) return <Loading />;
+  if (me.isError) return <ErrorState error={me.error} />;
   if (!me.data) return <Login />;
   const key = location.pathname.split("/")[2] || "overview",
     [title, subtitle] = titles[key] || titles.overview!;
@@ -564,7 +623,7 @@ function Shell() {
           >
             <div className="workspace-letter">N</div>
             <span>
-              <b>Northstar Engineering</b>
+              <b>{me.data.workspaceName}</b>
               <small>Commerce · synthetic</small>
             </span>
             <ChevronDown size={13} />
@@ -2014,12 +2073,18 @@ const faultNames: Record<string, string> = {
   "resource-saturation": "Resource saturation",
 };
 function Laboratory({ compare = false }: { compare?: boolean }) {
+  const runtime = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api<{ publicDemo: boolean }>("settings"),
+  });
+  const maxRate = runtime.data?.publicDemo === false ? 20 : 5;
+  const maxDuration = runtime.data?.publicDemo === false ? 90 : 30;
   const [form, setForm] = useState<ExperimentConfig>({
       name: compare ? "Controlled comparison" : "Healthy checkout baseline",
       fault: compare ? "pool-exhaustion" : "healthy",
       target: "inventory",
       duration: 20,
-      rate: 8,
+      rate: 5,
       seed: 42,
       magnitude: 400,
       failureRate: 0.65,
@@ -2179,7 +2244,7 @@ function Laboratory({ compare = false }: { compare?: boolean }) {
                 <input
                   type="number"
                   min={5}
-                  max={90}
+                  max={maxDuration}
                   value={form.duration}
                   onChange={(e) => field("duration", Number(e.target.value))}
                 />
@@ -2189,7 +2254,7 @@ function Laboratory({ compare = false }: { compare?: boolean }) {
                 <input
                   type="number"
                   min={1}
-                  max={20}
+                  max={maxRate}
                   value={form.rate}
                   onChange={(e) => field("rate", Number(e.target.value))}
                 />
@@ -2245,7 +2310,8 @@ function Laboratory({ compare = false }: { compare?: boolean }) {
             <div className="lab-boundaries">
               <Shield size={15} />
               <span>
-                Maximum 20 req/s · 90 seconds · 20 concurrent requests
+                Maximum {maxRate} req/s · {maxDuration} seconds · 20 concurrent
+                requests
                 <br />
                 Pool, queue, and fault duration are bounded.
               </span>
@@ -2323,8 +2389,8 @@ function Laboratory({ compare = false }: { compare?: boolean }) {
                 <h3>Ready for a controlled run.</h3>
                 <p>
                   Start with 20 seconds of healthy checkout traffic. Then apply
-                  inventory pool exhaustion at 8 req/s to observe contention and
-                  upstream symptoms.
+                  inventory pool exhaustion at {maxRate} req/s to observe
+                  contention and upstream symptoms.
                 </p>
                 <Link to="/app/traces">
                   Inspect captured requests <ArrowUpRight size={14} />
@@ -2874,8 +2940,8 @@ function Settings() {
             </dl>
             <p className="muted">
               Runtime boundaries are configured through environment variables
-              and require a process restart. Production mode requires PostgreSQL
-              and ClickHouse.
+              and require a process restart. PostgreSQL persists workspace data;
+              telemetry uses PostgreSQL or the optional ClickHouse adapter.
             </p>
           </div>
         </Panel>

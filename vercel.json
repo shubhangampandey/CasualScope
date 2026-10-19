@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "pnpm exec vite build --config apps/web/vite.config.ts",
+  "outputDirectory": "dist/web",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://casualscope-api.onrender.com/api/:path*"
+    },
+    { "source": "/((?!api(?:/|$)).*)", "destination": "/index.html" }
+  ]
+}

@@ -33,18 +33,76 @@ export class Store {
       CREATE TABLE IF NOT EXISTS ground_truth(workspace TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(workspace,id));`);
     } else {
       this.prisma = new PrismaClient();
-      this.ch = createClient({
-        url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-        username: process.env.CLICKHOUSE_USER || "causalscope",
-        password: process.env.CLICKHOUSE_PASSWORD,
-        database: "causalscope",
-        request_timeout: 10000,
-        clickhouse_settings: {
-          max_execution_time: 8,
-          max_result_rows: "50000",
-          result_overflow_mode: "throw",
-        },
-      });
+      if (mode === "production")
+        this.ch = createClient({
+          url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
+          username: process.env.CLICKHOUSE_USER || "causalscope",
+          password: process.env.CLICKHOUSE_PASSWORD,
+          database: "causalscope",
+          request_timeout: 10000,
+          clickhouse_settings: {
+            max_execution_time: 8,
+            max_result_rows: "50000",
+            result_overflow_mode: "throw",
+          },
+        });
+    }
+  }
+  async userByEmail<T>(email: string): Promise<T | undefined> {
+    const normalized = email.trim().toLowerCase();
+    if (this.db) {
+      const row = this.db
+        .prepare(
+          "SELECT data FROM records WHERE workspace='system' AND kind='user' AND lower(trim(json_extract(data,'$.email')))=? LIMIT 1",
+        )
+        .get(normalized);
+      return row ? (JSON.parse(row.data as string) as T) : undefined;
+    }
+    const rows = await this.prisma!.$queryRaw<
+      { data: T }[]
+    >`SELECT data FROM "StoredRecord" WHERE workspace='system' AND kind='user' AND lower(trim(data->>'email'))=${normalized} LIMIT 1`;
+    return rows[0]?.data;
+  }
+  async createAccount<
+    UserRecord extends { id: string },
+    WorkspaceRecord extends { id: string },
+  >(user: UserRecord, workspace: WorkspaceRecord) {
+    if (this.db) {
+      this.db.exec("BEGIN IMMEDIATE");
+      try {
+        const insert = this.db.prepare("INSERT INTO records VALUES(?,?,?,?,?)");
+        insert.run("system", "user", user.id, JSON.stringify(user), Date.now());
+        insert.run(
+          workspace.id,
+          "workspace",
+          workspace.id,
+          JSON.stringify(workspace),
+          Date.now(),
+        );
+        this.db.exec("COMMIT");
+      } catch (error) {
+        this.db.exec("ROLLBACK");
+        throw error;
+      }
+    } else {
+      await this.prisma!.$transaction([
+        this.prisma!.storedRecord.create({
+          data: {
+            workspace: "system",
+            kind: "user",
+            id: user.id,
+            data: JSON.parse(JSON.stringify(user)),
+          },
+        }),
+        this.prisma!.storedRecord.create({
+          data: {
+            workspace: workspace.id,
+            kind: "workspace",
+            id: workspace.id,
+            data: JSON.parse(JSON.stringify(workspace)),
+          },
+        }),
+      ]);
     }
   }
   async put<T extends { id: string }>(
@@ -137,6 +195,19 @@ export class Store {
         this.db.exec("ROLLBACK");
         throw e;
       }
+    } else if (!this.ch) {
+      await this.prisma!.telemetrySpan.createMany({
+        data: spans.map((span) => ({
+          workspace: span.workspace,
+          environment: span.environment,
+          traceId: span.traceId,
+          spanId: span.spanId,
+          service: span.service,
+          start: span.start,
+          data: JSON.parse(JSON.stringify(span)),
+        })),
+        skipDuplicates: true,
+      });
     } else
       await this.ch!.insert({
         table: "otel_spans",
@@ -179,6 +250,20 @@ export class Store {
         .all(...args)
         .map((r) => JSON.parse(r.data as string) as Span);
     }
+    if (!this.ch) {
+      const rows = await this.prisma!.telemetrySpan.findMany({
+        where: {
+          workspace: q.workspace,
+          environment: q.environment,
+          start: { gte: q.start, lte: q.end },
+          ...(q.traceId ? { traceId: q.traceId } : {}),
+          ...(q.service ? { service: q.service } : {}),
+        },
+        orderBy: { start: "desc" },
+        take: limit,
+      });
+      return rows.map((row) => row.data as unknown as Span);
+    }
     const result = await this.ch!.query({
       query: `SELECT data FROM otel_spans FINAL WHERE workspace={workspace:String} AND environment={environment:String} AND start>={start:Float64} AND start<={end:Float64} ${q.traceId ? "AND traceId={traceId:String}" : ""} ${q.service ? "AND service={service:String}" : ""} ORDER BY start DESC LIMIT {limit:UInt32}`,
       query_params: { ...q, limit },
@@ -196,6 +281,19 @@ export class Store {
       );
       for (const l of logs)
         stmt.run(l.workspace, l.environment, l.id, l.time, JSON.stringify(l));
+    } else if (!this.ch) {
+      await this.prisma!.telemetryLog.createMany({
+        data: logs.map((log) => ({
+          workspace: log.workspace,
+          environment: log.environment,
+          id: log.id,
+          traceId: log.traceId,
+          service: log.service,
+          time: log.time,
+          data: JSON.parse(JSON.stringify(log)),
+        })),
+        skipDuplicates: true,
+      });
     } else
       await this.ch!.insert({
         table: "correlated_logs",
@@ -218,7 +316,20 @@ export class Store {
         )
         .all(q.workspace, q.environment, q.start, q.end)
         .map((r) => JSON.parse(r.data as string));
-    else {
+    else if (!this.ch) {
+      const rows = await this.prisma!.telemetryLog.findMany({
+        where: {
+          workspace: q.workspace,
+          environment: q.environment,
+          time: { gte: q.start, lte: q.end },
+          ...(q.traceId ? { traceId: q.traceId } : {}),
+          ...(q.service ? { service: q.service } : {}),
+        },
+        orderBy: { time: "desc" },
+        take: 3000,
+      });
+      result = rows.map((row) => row.data as unknown as Log);
+    } else {
       const r = await this.ch!.query({
         query:
           "SELECT data FROM correlated_logs FINAL WHERE workspace={workspace:String} AND environment={environment:String} AND time>={start:Float64} AND time<={end:Float64} ORDER BY time DESC LIMIT 3000",
@@ -264,10 +375,19 @@ export class Store {
       { target: string; fault: string; seed: number } | undefined;
   }
   async prune() {
+    const cutoff = Date.now() - config.RETENTION_DAYS * 86400000;
     if (this.db) {
-      const cutoff = Date.now() - config.RETENTION_DAYS * 86400000;
       this.db.prepare("DELETE FROM spans WHERE start<?").run(cutoff);
       this.db.prepare("DELETE FROM logs WHERE time<?").run(cutoff);
+    } else if (!this.ch) {
+      await this.prisma!.$transaction([
+        this.prisma!.telemetrySpan.deleteMany({
+          where: { start: { lt: cutoff } },
+        }),
+        this.prisma!.telemetryLog.deleteMany({
+          where: { time: { lt: cutoff } },
+        }),
+      ]);
     }
   }
   async health() {
@@ -281,6 +401,16 @@ export class Store {
       };
     }
     await this.prisma!.$queryRaw`SELECT 1`;
+    if (!this.ch) {
+      await this.prisma!.telemetrySpan.findFirst({ select: { spanId: true } });
+      await this.prisma!.telemetryLog.findFirst({ select: { id: true } });
+      return {
+        mode: "postgres",
+        metadata: "PostgreSQL",
+        telemetry: "PostgreSQL",
+        collector: "not required in direct SDK mode",
+      };
+    }
     const h = await this.ch!.ping();
     if (!h.success) throw new Error("ClickHouse unavailable");
     return {

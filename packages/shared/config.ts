@@ -2,7 +2,7 @@ import "dotenv/config";
 import { z } from "zod";
 const schema = z.object({
   NODE_ENV: z.string().default("development"),
-  STORAGE_MODE: z.enum(["local", "production"]).default("local"),
+  STORAGE_MODE: z.enum(["local", "production", "postgres"]).default("local"),
   API_PORT: z.coerce.number().default(4400),
   INGEST_PORT: z.coerce.number().default(4319),
   WEB_ORIGIN: z.string().default("http://localhost:5180"),
@@ -14,15 +14,33 @@ const schema = z.object({
   RETENTION_DAYS: z.coerce.number().int().min(1).max(90).default(7),
 });
 export const config = schema.parse(process.env);
+export function isWebOrigin(origin?: string) {
+  if (origin === config.WEB_ORIGIN) return true;
+  if (!origin || config.NODE_ENV === "production") return false;
+  try {
+    const expected = new URL(config.WEB_ORIGIN);
+    const actual = new URL(origin);
+    const loopbacks = ["localhost", "127.0.0.1", "[::1]"];
+    return (
+      actual.origin === origin &&
+      actual.protocol === expected.protocol &&
+      actual.port === expected.port &&
+      loopbacks.includes(actual.hostname) &&
+      loopbacks.includes(expected.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
 if (config.NODE_ENV === "production") {
-  if (config.STORAGE_MODE !== "production")
-    throw new Error("Production requires PostgreSQL + ClickHouse");
+  if (config.STORAGE_MODE === "local")
+    throw new Error("Production requires persistent PostgreSQL storage");
   for (const name of [
     "SESSION_SECRET",
     "INGEST_TOKEN",
     "CONTROL_TOKEN",
     "DATABASE_URL",
-    "CLICKHOUSE_PASSWORD",
+    ...(config.STORAGE_MODE === "production" ? ["CLICKHOUSE_PASSWORD"] : []),
   ])
     if (
       !process.env[name] ||
