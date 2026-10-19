@@ -68,7 +68,11 @@ A separate paired-run orchestration check passed: 39 healthy requests with zero 
 
 No outstanding failure remains in the executed final build, unit/integration/security or browser suites. Earlier verification found and corrected Collector gzip handling, error logs starving trace exports, contaminated preceding-fault baselines, port conflicts, a trace/log query-range bug, and a status-update race that could clear an unsaved investigator note. The stronger browser workflow verifies the corrected behavior.
 
-Could not run: Docker/PostgreSQL/ClickHouse acceptance, production TLS/backup/restore, a live Gemini request without a key, independent held-out fault accuracy, sustained full-store ingestion/query benchmarks, comprehensive accessibility/security audit, and animation frame-time profiling. Basic success on this host does not substitute for these checks.
+Could not run in the original verification: Docker/PostgreSQL/ClickHouse acceptance, production TLS/backup/restore, a live Gemini request without a key, independent held-out fault accuracy, sustained full-store ingestion/query benchmarks, comprehensive accessibility/security audit, and animation frame-time profiling. Basic success on this host does not substitute for these checks.
+
+### Follow-up: Gemini integration, 19 October 2026
+
+A live authenticated `POST /api/v1/assist/:id` request using `gemini-3.5-flash-lite` returned HTTP 200, a non-empty summary, and valid evidence references. A request without explicit consent was rejected. Type checking, the production build, and all 19 existing tests passed. The key remains in ignored backend configuration. This follow-up does not validate the outstanding container, production, or statistical-evaluation checks above.
 
 ## 8. Benchmarks actually executed
 
